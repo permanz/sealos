@@ -1,10 +1,16 @@
 package install
 
 import (
+	"fmt"
 	"github.com/wonderivan/logger"
-	"golang.org/x/crypto/ssh"
 	"os"
 )
+
+// if can't access to hostName, set /etc/hosts
+func SetHosts(hostip, hostName string) {
+	cmd := fmt.Sprintf("cat /etc/hosts |grep %s || echo '%s %s' >> /etc/hosts", hostName, IpFormat(hostip), hostName)
+	SSHConfig.CmdAsync(hostip, cmd)
+}
 
 //CheckValid is
 func (s *SealosInstaller) CheckValid() {
@@ -21,31 +27,26 @@ func (s *SealosInstaller) CheckValid() {
 		logger.Error("hosts not allow empty")
 		os.Exit(1)
 	}
-	if User == "" {
+	if SSHConfig.User == "" {
 		s.Print("Fail")
 		logger.Error("user not allow empty")
 		os.Exit(1)
 	}
-	var session *ssh.Session
-	var errors []error
+	dict := make(map[string]bool)
 	for _, h := range s.Hosts {
-		session, err := Connect(User, Passwd, PrivateKeyFile, h)
-		if err != nil {
+		hostname := SSHConfig.CmdToString(h, "hostname", "") //获取主机名
+		if hostname == "" {
 			logger.Error("[%s] ------------ check error", h)
-			logger.Error("[%s] ------------ error[%s]", h, err)
-			errors = append(errors, err)
+			os.Exit(1)
 		} else {
-			logger.Crit("[%s]  ------------ check ok", h)
-			logger.Crit("[%s]  ------------ session[%p]", h, session)
+			SetHosts(h,hostname)
+			if _, ok := dict[hostname]; !ok {
+				dict[hostname] = true //不冲突, 主机名加入字典
+			} else {
+				logger.Error("duplicate hostnames is not allowed")
+				os.Exit(1)
+			}
+			logger.Info("[%s]  ------------ check ok", h)
 		}
-	}
-	defer func() {
-		if session != nil {
-			session.Close()
-		}
-	}()
-	if len(errors) > 0 {
-		logger.Error("has some linux server is connection ssh is failed")
-		os.Exit(1)
 	}
 }

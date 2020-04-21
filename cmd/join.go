@@ -16,6 +16,8 @@ package cmd
 
 import (
 	"github.com/fanux/sealos/install"
+	"github.com/wonderivan/logger"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -26,15 +28,17 @@ var joinCmd = &cobra.Command{
 	Short: "Simplest way to join your kubernets HA cluster",
 	Long:  `sealos join --node 192.168.0.5`,
 	Run: func(cmd *cobra.Command, args []string) {
-		beforeNodes:=install.ParseIPs(install.NodeIPs)
-		beforeMasters:=install.ParseIPs(install.MasterIPs)
+		beforeNodes := install.ParseIPs(install.NodeIPs)
+		beforeMasters := install.ParseIPs(install.MasterIPs)
 
 		c := &install.SealConfig{}
-		c.Load("")
-		install.BuildJoin(beforeMasters,beforeNodes)
-
-		install.NodeIPs = append(c.Nodes,beforeNodes...)
-		install.MasterIPs = append(c.Masters,beforeMasters...)
+		err := c.Load("")
+		if err != nil {
+			logger.Error(err)
+			c.ShowDefaultConfig()
+			os.Exit(0)
+		}
+		install.BuildJoin(beforeMasters, beforeNodes)
 		c.Dump("")
 	},
 }
